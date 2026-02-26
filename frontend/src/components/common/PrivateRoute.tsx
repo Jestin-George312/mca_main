@@ -8,19 +8,19 @@ interface PrivateRouteProps {
   allowedRoles?: Role[];
 }
 
-// Toggle to disable auth protection during frontend-only development.
-// Set to `false` to restore normal authentication checks.
-const DISABLE_AUTH = true;
-
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ allowedRoles }) => {
-  if (DISABLE_AUTH) return <Outlet />;
-
   const { user, isLoading } = useAuth();
-  if (isLoading) return <div>Loading...</div>;
-  if (!user) return <Navigate to="/" replace />;
+
+  if (isLoading) return (
+    <div className="h-screen w-full flex items-center justify-center bg-[rgb(var(--color-bg))]">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[rgb(var(--color-primary))]"></div>
+    </div>
+  );
+
+  if (!user) return <Navigate to="/login" replace />;
 
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   return <Outlet />;

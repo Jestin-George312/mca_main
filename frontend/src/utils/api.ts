@@ -1,19 +1,37 @@
-import axios from'axios';
+import axios from 'axios';
 
-const api=axios.create({
-    baseURL:import.meta.env.VITEq_API_URL,
-    headers:{
-        'content-type':'application/json'
+const api = axios.create({
+    baseURL: import.meta.env.VITE_API_URL,
+    headers: {
+        'Content-Type': 'application/json',
     },
-})
+});
 
-api.interceptors.request.use((config)=>{
-    const token=localStorage.getItem('token');
-    if(token){
-        config.headers.Authorization=`Bearer ${token}`;
+// Attach JWT token to every outgoing request
+api.interceptors.request.use((config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
+});
 
-})
+// Handle 401 responses globally — clear token and redirect to login
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            localStorage.removeItem('token');
+            // Only redirect if not already on login/landing page
+            if (
+                !window.location.pathname.startsWith('/login') &&
+                window.location.pathname !== '/'
+            ) {
+                window.location.href = '/login';
+            }
+        }
+        return Promise.reject(error);
+    }
+);
 
 export default api;

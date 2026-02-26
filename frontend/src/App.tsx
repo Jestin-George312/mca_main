@@ -6,11 +6,11 @@ import { lazy, Suspense } from 'react';
 import { AuthProvider } from './context/AuthContext';
 
 // Layout
-import PrivateRoute from './components/common/PrivateRoute';
 import MainLayout from './components/common/Layout/MainLayout';
 
 // Pages (eager load common ones)
 import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
 import Landing from './pages/Landing';
 import StudentDashboard from './pages/student/Dashboard';
 
@@ -24,6 +24,7 @@ const GuideDashboard = lazy(() => import('./pages/guide/Dashboard'));
 const ProjectRequests = lazy(() => import('./pages/guide/ProjectRequests'));
 const GuideChat = lazy(() => import('./pages/guide/Chat'));
 const GuideMeetings = lazy(() => import('./pages/guide/Meetings'));
+const GuideMyGroups = lazy(() => import('./pages/guide/MyGroups'));
 const CoordinatorDashboard = lazy(() => import('./pages/coordinator/Dashboard'));
 const GuideAllocation = lazy(() => import('./pages/coordinator/GuideAllocation'));
 const RubricBuilder = lazy(() => import('./pages/coordinator/RubricBuilder'));
@@ -47,43 +48,43 @@ function App() {
             {/* Public Routes */}
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
 
-            {/* Protected Routes */}
-            <Route element={<PrivateRoute />}>
-              <Route element={<MainLayout />}>
-                {/* Dashboard - default after login */}
-                <Route path="/dashboard" element={<StudentDashboard />} />
+            {/* App Routes (wrapped in layout) */}
+            <Route element={<MainLayout />}>
+              {/* Dashboard - default after login */}
+              <Route path="/dashboard" element={<StudentDashboard />} />
 
-                {/* Student Routes */}
-                <Route path="/student">
-                  <Route index element={<Navigate to="/student/dashboard" replace />} />
-                  <Route path="dashboard" element={<StudentDashboard />} />
-                  <Route path="submit-topic" element={<StudentTopicSubmission />} />
-                  <Route path="tasks" element={<StudentTaskBoard />} />
-                  <Route path="documents" element={<StudentDocuments />} />
-                  <Route path="chat" element={<StudentChat />} />
-                  <Route path="meetings" element={<StudentMeetings />} />
-                  <Route path="profile" element={<Profile />} />
-                </Route>
+              {/* Student Routes */}
+              <Route path="/student">
+                <Route index element={<Navigate to="/student/dashboard" replace />} />
+                <Route path="dashboard" element={<StudentDashboard />} />
+                <Route path="submit-topic" element={<StudentTopicSubmission />} />
+                <Route path="tasks" element={<StudentTaskBoard />} />
+                <Route path="documents" element={<StudentDocuments />} />
+                <Route path="chat" element={<StudentChat />} />
+                <Route path="meetings" element={<StudentMeetings />} />
+                <Route path="profile" element={<Profile />} />
+              </Route>
 
-                {/* Guide Routes */}
-                <Route path="/guide">
-                  <Route index element={<Navigate to="/guide/dashboard" replace />} />
-                  <Route path="dashboard" element={<GuideDashboard />} />
-                  <Route path="requests" element={<ProjectRequests />} />
-                  <Route path="chat" element={<GuideChat />} />
-                  <Route path="meetings" element={<GuideMeetings />} />
-                  <Route path="profile" element={<Profile />} />
-                </Route>
+              {/* Guide Routes */}
+              <Route path="/guide">
+                <Route index element={<Navigate to="/guide/dashboard" replace />} />
+                <Route path="dashboard" element={<GuideDashboard />} />
+                <Route path="requests" element={<ProjectRequests />} />
+                <Route path="groups" element={<GuideMyGroups />} />
+                <Route path="chat" element={<GuideChat />} />
+                <Route path="meetings" element={<GuideMeetings />} />
+                <Route path="profile" element={<Profile />} />
+              </Route>
 
-                {/* Coordinator Routes */}
-                <Route path="/coordinator">
-                  <Route index element={<Navigate to="/coordinator/dashboard" replace />} />
-                  <Route path="dashboard" element={<CoordinatorDashboard />} />
-                  <Route path="allocation" element={<GuideAllocation />} />
-                  <Route path="rubrics" element={<RubricBuilder />} />
-                  <Route path="profile" element={<Profile />} />
-                </Route>
+              {/* Coordinator Routes */}
+              <Route path="/coordinator">
+                <Route index element={<Navigate to="/coordinator/dashboard" replace />} />
+                <Route path="dashboard" element={<CoordinatorDashboard />} />
+                <Route path="allocation" element={<GuideAllocation />} />
+                <Route path="rubrics" element={<RubricBuilder />} />
+                <Route path="profile" element={<Profile />} />
               </Route>
             </Route>
 

@@ -1,27 +1,7 @@
-/**
- * =========================================
- * DEV MODE: Mock Authentication Context
- * =========================================
- * 
- * To switch user roles for testing, change the 'MOCK_ROLE' value below:
- * 
- *   'student'      → Student Dashboard, Topic Submission, Task Board, Documents
- *   'guide'        → Guide Dashboard, Project Requests, My Groups
- *   'coordinator'  → Coordinator Dashboard, Guide Allocation, Rubric Builder
- * 
- * After changing, save the file and the app will hot-reload with the new role.
- * =========================================
- */
-
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { User } from '../types';
-
-// ╔════════════════════════════════════════════════════════════╗
-// ║  CHANGE THIS TO TEST DIFFERENT USER ROLES                 ║
-// ║  Options: 'student' | 'guide' | 'coordinator'             ║
-// ╚════════════════════════════════════════════════════════════╝
-const MOCK_ROLE: 'student' | 'guide' | 'coordinator' = 'student';
+import type { User, Role } from '../types';
+import * as authApi from '../services/authApi';
 
 // Role to dashboard path mapping
 const ROLE_DASHBOARDS: Record<string, string> = {
@@ -30,34 +10,38 @@ const ROLE_DASHBOARDS: Record<string, string> = {
     coordinator: '/coordinator/dashboard',
 };
 
-// Mock user data based on role
-const MOCK_USERS: Record<string, User> = {
-    student: {
-        id: 'student-123',
-        name: 'John Student',
-        email: 'john.student@example.com',
-        role: 'student',
-        picture: 'https://ui-avatars.com/api/?name=John+Student&background=3b82f6&color=fff'
-    },
-    guide: {
-        id: 'guide-456',
-        name: 'Dr. Sarah Guide',
-        email: 'sarah.guide@example.com',
-        role: 'guide',
-        picture: 'https://ui-avatars.com/api/?name=Sarah+Guide&background=8b5cf6&color=fff'
-    },
-    coordinator: {
-        id: 'coord-789',
-        name: 'Prof. Mike Coordinator',
-        email: 'mike.coordinator@example.com',
-        role: 'coordinator',
-        picture: 'https://ui-avatars.com/api/?name=Mike+Coordinator&background=f59e0b&color=fff'
-    },
+/**
+ * Normalize a backend role (e.g. 'Student') to lowercase ('student')
+ * to match the frontend's Role type and routing conventions.
+ */
+const normalizeRole = (role: string): Role => {
+    return role.toLowerCase() as Role;
 };
+
+/**
+ * Map a backend user response to the frontend User shape.
+ */
+const mapBackendUser = (backendUser: authApi.BackendUser): User => ({
+    id: String(backendUser.uid),
+    name: backendUser.full_name,
+    email: backendUser.email,
+    role: normalizeRole(backendUser.role),
+    picture: backendUser.profile_img || undefined,
+});
+
+const mapLoginUser = (loginUser: authApi.LoginResponse['user']): User => ({
+    id: String(loginUser.id),
+    name: loginUser.name,
+    email: loginUser.email,
+    role: normalizeRole(loginUser.role),
+    picture: loginUser.picture || undefined,
+});
 
 interface AuthContextType {
     user: User | null;
-    loginWithGoogle: () => void;
+    loginWithGoogle: (credential: string) => Promise<void>;
+    loginWithCredentials: (email: string, password: string) => Promise<void>;
+    register: (payload: authApi.RegisterPayload) => Promise<void>;
     logout: () => void;
     isLoading: boolean;
 }
@@ -65,24 +49,96 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<User | null>(MOCK_USERS[MOCK_ROLE]);
-    const [isLoading] = useState(false);
+    const [user, setUser] = useState<User | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
 
-    // Mock login function - navigates to the appropriate dashboard based on role
-    const loginWithGoogle = () => {
-        const mockUser = MOCK_USERS[MOCK_ROLE];
-        setUser(mockUser);
-        navigate(ROLE_DASHBOARDS[mockUser.role] || '/dashboard');
-    };
+    // On mount: check for an existing token and restore the session
+    useEffect(() => {
+        const restoreSession = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                setIsLoading(false);
+                return;
+            }
 
-    const logout = () => {
+            try {
+                const backendUser = await authApi.getCurrentUser();
+                setUser(mapBackendUser(backendUser));
+            } catch {
+                // Token is invalid or expired — clean up
+                authApi.logout();
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        restoreSession();
+    }, []);
+
+    /**
+     * Called after the Google sign-in popup returns a credential token.
+     * Sends it to the backend, stores the JWT, and navigates to the dashboard.
+     */
+    const loginWithGoogle = useCallback(async (credential: string) => {
+        setIsLoading(true);
+        try {
+            const result = await authApi.googleLogin(credential);
+            const mappedUser = mapLoginUser(result.user);
+            setUser(mappedUser);
+            navigate(ROLE_DASHBOARDS[mappedUser.role] || '/dashboard');
+        } catch (error) {
+            console.error('Login failed:', error);
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
+    }, [navigate]);
+
+    /**
+     * Login with email and password credentials.
+     */
+    const loginWithCredentials = useCallback(async (email: string, password: string) => {
+        setIsLoading(true);
+        try {
+            const result = await authApi.loginWithCredentials(email, password);
+            const mappedUser = mapLoginUser(result.user);
+            setUser(mappedUser);
+            navigate(ROLE_DASHBOARDS[mappedUser.role] || '/dashboard');
+        } catch (error) {
+            console.error('Login failed:', error);
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
+    }, [navigate]);
+
+    /**
+     * Register a new user account and auto-login.
+     */
+    const register = useCallback(async (payload: authApi.RegisterPayload) => {
+        setIsLoading(true);
+        try {
+            const result = await authApi.register(payload);
+            const mappedUser = mapLoginUser(result.user);
+            setUser(mappedUser);
+            navigate(ROLE_DASHBOARDS[mappedUser.role] || '/dashboard');
+        } catch (error) {
+            console.error('Registration failed:', error);
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
+    }, [navigate]);
+
+    const logout = useCallback(() => {
+        authApi.logout();
         setUser(null);
         navigate('/login');
-    };
+    }, [navigate]);
 
     return (
-        <AuthContext.Provider value={{ user, loginWithGoogle, logout, isLoading }}>
+        <AuthContext.Provider value={{ user, loginWithGoogle, loginWithCredentials, register, logout, isLoading }}>
             {children}
         </AuthContext.Provider>
     );
